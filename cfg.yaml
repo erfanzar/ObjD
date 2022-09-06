@@ -3,21 +3,19 @@
   - 32
   - true
   - true
+  - 3
   - 1
-  - 2
-  - 0
 - - Conv
   - 32
   - 64
   - true
   - true
   - 3
-  - 1
-  - 0
+  - 2
 - - ResidualBlock
   - 64
   - 1
-  - false
+  - true
 - - Conv
   - 64
   - 128
@@ -25,11 +23,21 @@
   - true
   - 3
   - 2
-  - 0
+- - ResidualBlock
+  - 128
+  - 1
+  - true
+- - Conv
+  - 128
+  - 128
+  - true
+  - true
+  - 3
+  - 2
 - - ResidualBlock
   - 128
   - 2
-  - false
+  - true
 - - Conv
   - 128
   - 256
@@ -37,53 +45,43 @@
   - true
   - 3
   - 2
-  - 0
 - - ResidualBlock
   - 256
-  - 8
-  - true
-- - Conv
-  - 256
-  - 512
-  - true
-  - true
-  - 3
   - 2
-  - 0
-- - Detect
-  - 512
-  - 4
-- - Conv
-  - 512
-  - 256
   - true
-  - true
-  - 3
-  - 2
-  - 0
-- - UpSample
-  - 2
-- - Connect
-  - - 1
-    - x
-    - 1
-- - Detect
-  - 256
-  - 4
 - - Conv
   - 256
   - 128
   - true
   - true
-  - 3
+  - 1
   - 2
-  - 0
 - - UpSample
   - 2
-- - Connect
-  - - 2
-    - x
-    - 1
 - - Detect
-  - 128
+  - 384
+  - 4
+- - Conv
+  - 384
+  - 256
+  - true
+  - true
+  - 3
+  - 2
+- - UpSample
+  - 4
+- - Detect
+  - 384
+  - 4
+- - Conv
+  - 384
+  - 256
+  - true
+  - true
+  - 3
+  - 2
+- - UpSample
+  - 4
+- - Detect
+  - 384
   - 4

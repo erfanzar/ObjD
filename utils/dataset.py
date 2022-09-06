@@ -7,6 +7,8 @@ import yaml
 from PIL import Image
 from torch.utils.data import Dataset
 
+DEVICE = 'cuda:0' if T.cuda.is_available() else 'cpu'
+
 
 class DataReader(Dataset):
 
@@ -28,15 +30,15 @@ class DataReader(Dataset):
     def __getitem__(self, item, train: bool = True):
         with open(f'{self.path_train}/{self.ti[item][:-4]}.txt', 'r') as r:
             ic = r.readlines()
-        y = T.zeros(len(ic), 4 + self.nc)
+        y = T.zeros(len(ic), 5 + self.nc)
         img = Image.open(f'{self.path_train}/{self.ti[item][:-4]}.jpg')
         for idx, data in enumerate(ic):
             ici = ic[idx].replace(' ', '-')
             ha = [i for i, h in enumerate(ici) if h == '-']
             c, x1, x2, y1, y2 = [ici[0:ha[0]], ici[ha[0]:ha[1]], ici[ha[1]:ha[2]], ici[ha[2]:ha[3]], ici[ha[3]:]]
-            c_array = np.zeros(self.nc)
+            c_array = np.zeros(self.nc + 1)
             c = int(c)
-            c_array[c] = 1
+            c_array[c + 1] = 1
             nw = np.array([x1, x2, y1, y2]).astype(np.float64)
             y[idx, 0:4] = T.from_numpy(nw)
             y[idx, 4:] = T.from_numpy(c_array)
@@ -49,5 +51,9 @@ class DataReader(Dataset):
         image_rgb = np.array(image_pixel).reshape((416, 416, 3))
         image_bgr = image_rgb[:, :, ::-1]
         x = to_tensor(image_rgb)
-        x = ts(tn(tt(x)))
-        return x, y, image_rgb, image_bgr
+        x = ts(tn(tt(x))).permute(2, 1, 0).reshape(1, 3, 416, 416)
+        if DEVICE == 'cuda:0':
+            x = x.type(T.cuda.FloatTensor)
+        else:
+            x = x.type(T.FloatTensor)
+        return x, y
