@@ -1,0 +1,94 @@
+cfg:
+- attributes:
+  - 3
+  - 32
+  - 3
+  - 1
+  - true
+  - true
+  name: Conv
+- attributes:
+  - 32
+  - 64
+  - 3
+  - 2
+  - true
+  - true
+  name: Conv
+- attributes:
+  - 64
+  - 4
+  - true
+  name: ResidualBlock
+- attributes:
+  - 64
+  - 128
+  - true
+  - 2
+  - 0.8
+  name: C3
+- attributes:
+  - 128
+  - 256
+  - 3
+  - 2
+  - true
+  - true
+  name: Conv
+- attributes:
+  - 256
+  - 2
+  - true
+  name: ResidualBlock
+- attributes:
+  - 256
+  - 1
+  - 2
+  name: RepConv
+- attributes:
+  - 256
+  - 384
+  - 3
+  - 2
+  - true
+  - true
+  name: Conv
+- attributes:
+  - 384
+  - 4
+  name: Detect
+- attributes:
+  - 384
+  - 1
+  - 2
+  name: RepConv
+- attributes:
+  - 384
+  - 512
+  - 3
+  - 2
+  - true
+  - true
+  name: Conv
+- attributes:
+  - 512
+  - 4
+  name: Detect
+- attributes:
+  - 512
+  - 1
+  - 2
+  name: RepConv
+- attributes:
+  - 512
+  - 768
+  - 3
+  - 2
+  - true
+  - true
+  name: Conv
+- attributes:
+  - 768
+  - 4
+  name: Detect
+nc: 4
