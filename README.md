@@ -2,7 +2,7 @@ Model Architectire :
 
 
 
-<img src="https://raw.githubusercontent.com/erfanzar/ObjD/main/Read/modelArchitecture.png"  width="500" height="600">
+<img src="https://raw.githubusercontent.com/erfanzar/ObjD/main/Read/modelArchitecture.png" height="600">
 
 
 
