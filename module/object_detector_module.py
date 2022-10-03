@@ -3,7 +3,7 @@ import torch.nn as nn
 import yaml
 from colorama import Fore
 from .loss import Loss
-from .commons import (Conv, Detect, ResidualBlock, Neck, C3, C4P, MP, UC1, CV1, RepConv, ConvSc)
+from .commons import (Conv, Detect, ResidualBlock, Neck, C3, C4P, MP, UC1, CV1, RepConv, ConvSc, LP)
 import pytorch_lightning as pl
 from torchmetrics.functional import accuracy
 
@@ -45,7 +45,7 @@ class ObjectDetectorModule(pl.LightningModule):
             if cfg['name'] == 'Detect':
                 layers.append(Detect(c1=at[0], nc=at[1]).to(DEVICE))
             if cfg['name'] == 'UpSample':
-                layers.appendnn.Upsample(scale_factor=at[0]).to(DEVICE)
+                layers.append(nn.Upsample(scale_factor=at[0]).to(DEVICE))
             if cfg['name'] == 'C3':
                 layers.append(C3(c1=at[0], c2=at[1], shortcut=at[2], n=at[3], e=at[4]).to(DEVICE))
             if cfg['name'] == 'Neck':
@@ -62,6 +62,8 @@ class ObjectDetectorModule(pl.LightningModule):
                 layers.append(RepConv(c=at[0], e=at[1], n=at[2]))
             if cfg['name'] == 'ConvSc':
                 layers.append(ConvSc(c=at[0], n=at[1]))
+            if cfg['name'] == 'LP':
+                layers.append(LP(at[0]))
         return nn.Sequential(*layers)
 
     # @torch.jit.script
@@ -153,28 +155,24 @@ class ObjectDetectorModule(pl.LightningModule):
     def training_step(self, batch, batch_index):
         x, y = batch
         x_ = self(x)
-        loss = (self.loss.forward(x_[0], y[2], 0) + self.loss.forward(x_[1], y[1], 1) + self.loss.forward(x_[2], y[0],
-                                                                                                          2))
-        # acc_train_v1 = accuracy(x_[0], target=y[2].int())
-        # acc_train_v2 = accuracy(x_[1], target=y[1].int())
-        # acc_train_v3 = accuracy(x_[2], target=y[0].int())
-        # self.log('train_acc', torch.tensor((acc_train_v1, acc_train_v2, acc_train_v3)), prog_bar=True, on_step=True,
-        #          on_epoch=True)
-        self.log('train_loss', loss, prog_bar=True, on_step=True,
+        loss = (self.loss.forward(x_[0], y[0]) +
+                self.loss.forward(x_[1], y[1]) +
+                self.loss.forward(x_[2], y[2])
+                )
+
+        self.log('train_loss', loss, prog_bar=True, on_step=False,
                  on_epoch=True)
-        return {"loss": loss}
+        return loss
 
     def validation_step(self, batch, batch_index):
         x, y = batch
         x_ = self(x)
 
-        loss = (self.loss.forward(x_[0], y[2], 0) + self.loss.forward(x_[1], y[1], 1) + self.loss.forward(x_[2], y[0],
-                                                                                                          2))
-        # acc_val_v1 = accuracy(x_[0], target=y[2].int())
-        # acc_val_v2 = accuracy(x_[1], target=y[1].int())
-        # acc_val_v3 = accuracy(x_[2], target=y[0].int())
-        # self.log('val_acc', torch.tensor((acc_val_v1, acc_val_v2, acc_val_v3)), prog_bar=True, on_step=True,
-        #          on_epoch=True)
-        self.log('val_loss', loss, prog_bar=True, on_step=True,
+        loss = (self.loss.forward(x_[0], y[0]) +
+                self.loss.forward(x_[1], y[1]) +
+                self.loss.forward(x_[2], y[2])
+                )
+        self.log('val_loss', loss, prog_bar=True, on_step=False,
                  on_epoch=True)
-        return {"loss": loss}
+
+        return loss

@@ -1,3 +1,4 @@
+
 all the cnn modules:
 
 ------------------------------------------------------------
@@ -23,4 +24,3 @@ MP [] # Creating A New Route or add to new one
 - act : activation function on module
 - bn : batch normalization on module
 - s : stride
-

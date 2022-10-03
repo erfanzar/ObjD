@@ -73,61 +73,44 @@ class DataLoaderLightning(LightningDataModule):
                 np.loadtxt(f'{path}/{current[item][:-4]}.txt', delimiter=" ", ndmin=2, ), 4,
                 axis=1).tolist() if len(sr) != 0 else []
 
-            targets = [torch.zeros(3, S, S, 5 + self.nc) for S in self.s]
+            targets = [torch.zeros(1, S, S, 5 + self.nc) for S in self.s]
             for box in bboxes:
-                x1, y1, w, h, class_label = box
-                dpa = torch.zeros(self.nc)
+                x1, y1, w, h, class_index = box
+                for index, st in enumerate(self.s):
+                    x_i, y_i, w_i, h_i = int(x1 * st), int(y1 * st), int(w * st), int(h * st)
+                    ca = torch.zeros(self.nc)[int(class_index)] == 1
 
-                dpa[int(class_label)] = 1
-                class_label = dpa
-                has_anchor = [False] * 3
-                for anchor_idx in range(3):
-                    scale_idx = torch.div((1e-16 + anchor_idx), other=3)
-                    scale_idx = int(scale_idx)
-                    anchor_on_scale = anchor_idx % 3
-                    S = self.s[scale_idx]
-                    i, j = int(S * y1), int(S * x1)
-
-                    anchor_taken = targets[scale_idx][anchor_on_scale, i, j, 0]
-                    if not anchor_taken and not has_anchor[scale_idx]:
-                        targets[scale_idx][anchor_on_scale, i, j, 0] = 1
-                        x_cell, y_cell = S * x1 - j, S * y1 - i
-
-                        box_coordinates = torch.tensor(
-                            [x1 * S, y1 * S, h * S, h * S]
-                        )
-                        targets[scale_idx][anchor_on_scale, i, j, 1:5] = box_coordinates
-                        targets[scale_idx][anchor_on_scale, i, j, 5:] = class_label
-
-                        has_anchor[scale_idx] = True
+                    targets[index][0, x_i, y_i, 0] = 1
+                    box_c = torch.tensor(
+                        [x_i, y_i, w_i, h_i]
+                    )
+                    targets[index][0, x_i, y_i, 1:5] = box_c
+                    targets[index][0, x_i, y_i, 5:] = ca
 
             img = Image.open(f'{path}/{current[item][:-4]}.jpg')
             to_tensor = lambda ten: torch.from_numpy(ten)
-            tt = lambda xf: xf.type(T.float64)
-            tn = lambda xr: xr / 255
-            ts = lambda xs: xs.reshape((self.img_shape, self.img_shape, 3))
+            tt, tn, ts = [lambda xf: xf.type(T.float64), lambda xr: xr / 255, lambda xs: xs.reshape(
+                (self.img_shape, self.img_shape, 3))]
+
             data = img.getdata()
             image_pixel = list(list(pixel) for pixel in data)
             image_rgb = np.array(image_pixel).reshape((self.img_shape, self.img_shape, 3))
             image_bgr = image_rgb[:, :, ::-1]
-            x = to_tensor(image_rgb)
-            x = ts(tn(tt(x))).permute(2, 1, 0).reshape(3, self.img_shape, self.img_shape)
-            if DEVICE == 'cuda:0':
-                x = x.type(T.cuda.FloatTensor)
-            else:
-                x = x.type(T.FloatTensor)
+            x = ts(tn(tt(to_tensor(image_rgb)))).permute(2, 1, 0).reshape(3, self.img_shape, self.img_shape)
+            x = x.type(T.cuda.FloatTensor) if DEVICE == 'cuda:0' else x.type(T.FloatTensor)
             xsl.append(x)
             ysl.append(tuple(targets))
-
             sys.stdout.write('\r Moving Data To Ram Or Gpu %{} remaining '.format(
                 f"{((item / tm) * 100):.4f}"))
         sys.stdout.write('\n')
         return xsl, ysl
 
     def train_dataloader(self):
+        del self.ti
         data_train = DataReader(self.x_train, self.y_train)
-        return DataLoader(data_train, batch_size=self.batch_size, num_workers=6)
+        return DataLoader(data_train, batch_size=self.batch_size, num_workers=2)
 
     def val_dataloader(self):
+        del self.vi
         data_val = DataReader(self.x_val, self.y_val)
-        return DataLoader(data_val, batch_size=self.batch_size, num_workers=6)
+        return DataLoader(data_val, batch_size=self.batch_size, num_workers=2)

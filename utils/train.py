@@ -72,9 +72,7 @@ class OldMethodTrain(TrainDi):
                     x = self.net.forward(x)
                     y = [torch.unsqueeze(v, 0) for v in y]
 
-                    loss = (self.loss(x=x[0], y=y[2], index=0)
-                            + self.loss(x=x[1], y=y[1], index=3)
-                            + self.loss(x=x[2], y=y[0], index=6))
+                    loss = self.loss(x, y)
 
                 acc = None
                 if fr:

@@ -15,18 +15,19 @@ class Conv(pl.LightningModule):
         self.batch = batch
         self.to(DEVICE)
         self.conv = nn.Conv2d(c1, c2, **kwargs).to(DEVICE)
-        self.r = nn.LeakyReLU(0.2).to(DEVICE)
+        nn.init.xavier_normal_(self.conv.weight.data)
+        self.r = nn.LeakyReLU(0.02).to(DEVICE)
         self.n = nn.BatchNorm2d(c2).to(DEVICE)
 
     def forward(self, x) -> T.Tensor:
-
+        x += 1e-32
         x = self.conv(x)
         if self.batch:
             x = self.n(x)
         if self.act:
             x = self.r(x)
 
-        return x
+        return x + 1e-32
 
 
 class Neck(pl.LightningModule):
@@ -123,17 +124,20 @@ class ResidualBlock(pl.LightningModule):
 
 
 class Detect(pl.LightningModule):
-    def __init__(self, c1, nc):
+    def __init__(self, c1, nc, use_anc: bool = False):
         super(Detect, self).__init__()
         self.nc = nc
         self.to(DEVICE)
+        self.use_anc = use_anc
         self.layer = nn.Sequential(
             Conv(c1=c1, c2=c1 * 2, act=True, batch=False, kernel_size=1),
-            Conv(c1=c1 * 2, c2=(5 + self.nc) * 3, kernel_size=1, batch=False, padding=0, stride=1, act=True)
+            Conv(c1=c1 * 2, c2=(5 + self.nc) * 3 if use_anc else (5 + self.nc), kernel_size=1, batch=False, padding=0,
+                 stride=1, act=True)
         )
 
     def forward(self, x) -> T.Tensor:
-        return self.layer(x).reshape(x.shape[0], 3, self.nc + 5, x.shape[2], x.shape[3]).permute(0, 1, 3, 4, 2)
+        return self.layer(x).reshape(x.shape[0], 3 if self.use_anc else 1, self.nc + 5, x.shape[2], x.shape[3]).permute(
+            0, 1, 3, 4, 2)
 
 
 class CV1(pl.LightningModule):
@@ -176,3 +180,12 @@ class MP(pl.LightningModule):
     def forward(self, x, ls):
         ls.append(x)
         return ls
+
+
+class LP(pl.LightningModule):
+    def __init__(self, dim: int = None):
+        super(LP, self).__init__()
+        self.dim = dim
+
+    def forward(self, l1, l2, dim_f: int = 1):
+        return torch.cat((l1, l2), dim=dim_f if self.dim is None else self.dim)

@@ -5,8 +5,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-DEVICE = 'cuda:0' if torch.cuda.is_available() else "cpu"
-
 
 def iou(box1, box2):
     b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3],
@@ -34,31 +32,23 @@ class Loss(pl.LightningModule):
         self.bce = nn.BCEWithLogitsLoss()
         self.ca = nn.CrossEntropyLoss()
         self.sigmoid = nn.Sigmoid()
-        self.to(DEVICE)
-        self.anc = [
-            [[10 / 7, 13 / 7], [16 / 7, 30 / 7], [33 / 7, 23 / 7]],
-            [[30 / 26, 61 / 26, ], [62 / 26, 45 / 26, ], [59 / 26, 119 / 26]],
-            [[116 / 52, 90 / 52, ], [156 / 52, 198 / 52, ], [373 / 52, 326 / 52],
-             ]]
-        self.anc = torch.tensor(self.anc[0] + self.anc[2] + self.anc[2])
 
-    def forward(self, x, y, index):
+    def forward(self, x, y):
+        device = x.device
+
         obj = y[..., 0] == 1
         no_obj = y[..., 0] == 0
-        # print(y[obj])
         nol = self.bce(
-            (x[..., 0:1][no_obj]).to(DEVICE), (y[..., 0:1][no_obj].to(DEVICE))
+            (x[..., 0:1][no_obj]).to(device), (y[..., 0:1][no_obj].to(device))
         )
-        # print(self.anc)
-        # print(self.anc[l * 3:(l * 3) + 3])
-        anc = self.anc[index:index + 3].reshape(1, 3, 1, 1, 2)
+
         box_pred = torch.cat(
-            [self.sigmoid(x[..., 1:3]).to(DEVICE), torch.exp(x[..., 3:5]).to(DEVICE) * anc.to(DEVICE)],
+            [self.sigmoid(x[..., 1:3]).to(device), torch.exp(x[..., 3:5]).to(device)],
             dim=-1)
-        ious = intersection_over_union(box_pred[obj].to(DEVICE), y[..., 1:5][obj].to(DEVICE)).detach()
+        iou_s = intersection_over_union(box_pred[obj].to(device), y[..., 1:5][obj].to(device)).detach()
 
         ol = self.mse(
-            self.sigmoid(x[..., 0:1][obj]).to(DEVICE), (ious.to(DEVICE) * y[..., 0:1][obj].to(DEVICE))
+            self.sigmoid(x[..., 0:1][obj]).to(device), (iou_s.to(device) * y[..., 0:1][obj].to(device))
         )
 
         x[..., 1:3] = self.sigmoid(x[..., 1:3])
@@ -66,10 +56,10 @@ class Loss(pl.LightningModule):
             (1e-16 + y[..., 3:5])
         )
 
-        box_loss = self.mse(x[..., 1:5][obj], y[..., 1:5][obj].to(DEVICE))
+        box_loss = self.mse(x[..., 1:5][obj], y[..., 1:5][obj].to(device))
 
         class_loss = self.bce(
-            (F.softmax(x[..., 5:][obj], dim=-1).to(DEVICE)), (y[..., 5:][obj].float().to(DEVICE))
+            (F.softmax(x[..., 5:][obj], dim=-1).to(device)), (y[..., 5:][obj].float().to(device))
         )
 
         loss = nol * 1 + box_loss * 1 + ol * 1 + class_loss * 1

@@ -1,4 +1,5 @@
 
+
 import argparse
 import pefile
 import glob
@@ -54,12 +55,6 @@ def main(args):
         for failure in failures:
             print( f" - {failure}")
 
-
-
-
-
-
-
 def parseArgs():
     parser = argparse.ArgumentParser( description="Disable ASLR and make .nv_fatb sections read-only", formatter_class=argparse.ArgumentDefaultsHelpFormatter )
     parser.add_argument('--input', help="Glob to parse", default="*.dll")
@@ -68,10 +63,8 @@ def parseArgs():
 
     return parser.parse_args()
 
-
 ###############################
 # program entry point
-#
 if __name__ == "__main__":
     args = parseArgs()
     main( args )
