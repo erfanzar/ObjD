@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from utils.utils import intersection_over_union
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
@@ -38,30 +37,6 @@ class Loss(pl.LightningModule):
 
         obj = y[..., 0] == 1
         no_obj = y[..., 0] == 0
-        nol = self.bce(
-            (x[..., 0:1][no_obj]).to(device), (y[..., 0:1][no_obj].to(device))
-        )
-
-        box_pred = torch.cat(
-            [self.sigmoid(x[..., 1:3]).to(device), torch.exp(x[..., 3:5]).to(device)],
-            dim=-1)
-        iou_s = intersection_over_union(box_pred[obj].to(device), y[..., 1:5][obj].to(device)).detach()
-
-        ol = self.mse(
-            self.sigmoid(x[..., 0:1][obj]).to(device), (iou_s.to(device) * y[..., 0:1][obj].to(device))
-        )
-
-        x[..., 1:3] = self.sigmoid(x[..., 1:3])
-        y[..., 3:5] = torch.log(
-            (1e-16 + y[..., 3:5])
-        )
-
-        box_loss = self.mse(x[..., 1:5][obj], y[..., 1:5][obj].to(device))
-
-        class_loss = self.bce(
-            (F.softmax(x[..., 5:][obj], dim=-1).to(device)), (y[..., 5:][obj].float().to(device))
-        )
-
-        loss = nol * 1 + box_loss * 1 + ol * 1 + class_loss * 1
+        loss = 1
 
         return loss

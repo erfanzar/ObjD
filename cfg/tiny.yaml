@@ -1,0 +1,21 @@
+nc: 4
+
+backbone: [
+  [ -1,1,MP ],
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,3,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,3,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,3,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ [ -1,-2,-3,-5 ],1,Concat,1 ]
+]
+
+head: [
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+]
