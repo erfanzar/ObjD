@@ -36,7 +36,8 @@ class Concat(pl.LightningModule):
 
     def forward(self, x):
         c = [x[d] for d in self.major]
-        return torch.cat(c, self.dim)
+        x.append(torch.cat(c, self.dim))
+        return x
 
 
 class Neck(pl.LightningModule):
@@ -191,13 +192,25 @@ class UC1(pl.LightningModule):
 
 
 class MP(pl.LightningModule):
-    def __init__(self):
+    def __init__(self, k=2, form: int = -1):
         super(MP, self).__init__()
-        self.ls = None
+        self.form = form
+        self.m = nn.MaxPool2d(kernel_size=k, stride=k)
 
-    def forward(self, x, ls):
-        ls.append(x)
-        return ls
+    def forward(self, x):
+        x.append(self.m(x[self.form]))
+        return x
+
+
+class SP(pl.LightningModule):
+    def __init__(self, k=3, s=1, form: int = -1):
+        super(SP, self).__init__()
+        self.form = form
+        self.m = nn.MaxPool2d(kernel_size=k, stride=s, padding=k // 2)
+
+    def forward(self, x):
+        x.append(self.m(x[self.form]))
+        return x
 
 
 class LP(pl.LightningModule):
@@ -207,3 +220,14 @@ class LP(pl.LightningModule):
 
     def forward(self, l1, l2, dim_f: int = 1):
         return torch.cat((l1, l2), dim=dim_f if self.dim is None else self.dim)
+
+
+class UpSample(pl.LightningModule):
+    def __init__(self, s, m, form: int = -1):
+        super(UpSample, self).__init__()
+        self.form = form
+        self.u = nn.Upsample(scale_factor=s, mode=m)
+
+    def forward(self, x):
+        x.append(self.u(x[self.form]))
+        return x

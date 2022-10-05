@@ -1,14 +1,24 @@
 nc: 4
 
+#  [ -1, 1,UpSample, [ 2, "'nearest'" ] ],
+#  [ -1,1,MP,[ ] ],
+
 backbone: [
-  [ -1,1,MP ],
+
   [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
   [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
   [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
   [ -1,1,Conv,[ 32,3,1,None,1,nn.LeakyReLU(0.1) ] ],
   [ -1,1,Conv,[ 32,3,1,None,1,nn.LeakyReLU(0.1) ] ],
   [ -1,1,Conv,[ 32,3,1,None,1,nn.LeakyReLU(0.1) ] ],
-  [ [ -1,-2,-3,-5 ],1,Concat,1 ]
+  [ [ -1,-2,-3,-5 ],1,Concat,1 ],
+  [ -1,1,MP,[ ] ], # 8 P - 2
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,1,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,3,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,3,1,None,1,nn.LeakyReLU(0.1) ] ],
+  [ -1,1,Conv,[ 32,3,1,None,1,nn.LeakyReLU(0.1) ] ],
 ]
 
 head: [

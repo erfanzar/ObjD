@@ -33,6 +33,7 @@ def module_creator(backbone, head, print_status, ic_backbone,
         form = b[0]
         name = b[2]
         attr = attr_exist_check_(b, 3)
+        ic_backbone = ic_backbone * len(form) if name == 'Concat' else ic_backbone
         backbone_m.append(
             name_to_layer(name=name, attr=attr, prefix=ic_backbone, in_case_prefix_use=in_case_prefix_use, form=form,
                           print_debug=print_status))
@@ -45,6 +46,7 @@ def module_creator(backbone, head, print_status, ic_backbone,
         form = h[0]
         name = h[2]
         attr = attr_exist_check_(h, 3)
+        ic_head = ic_head * len(form) if name == 'Concat' else ic_head
         head_m.append(
             name_to_layer(name=name, attr=attr, prefix=ic_head, in_case_prefix_use=in_case_prefix_use, form=form,
                           print_debug=print_status))

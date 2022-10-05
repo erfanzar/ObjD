@@ -1,3 +1,5 @@
+import sys
+
 import torch
 import torch.nn as nn
 import yaml
@@ -25,7 +27,9 @@ class ObjectDetectorModule(pl.LightningModule):
             data = yaml.full_load(r)
         self.nc = data['nc']
         bone_list, head_list = data['backbone'], data['head']
-        self.layers_bone, self.layers_head = module_creator(bone_list, head_list, self.fr, 3, 3)
+        self.layers_bone, self.layers_head = module_creator(
+            bone_list, head_list, True, 3,
+            3, )  # backbone list , head list , print Status, image channel backbone and head
 
     def size(self):
         ps = 0
@@ -37,15 +41,10 @@ class ObjectDetectorModule(pl.LightningModule):
         print(f' TOTAL SIZE  :  {ps} MB')
 
     def back_forward(self, x):
-        route, mp = [], []
         x = [x]
-        for layer in self.layers_bone:
-            if isinstance(layer, MP):
-                mp = layer.forward(x, mp)
-                continue
-            x = layer.forward(x)
-            print('------------------------')
-            print(*(xs.shape for xs in x))
+        for i, layer in enumerate(self.layers_bone):
+            x = layer(x)
+            # print(i)
         return x
 
     def head_forward(self, x):
