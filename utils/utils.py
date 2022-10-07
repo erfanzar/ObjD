@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+from .logger import print_model
 from module.commons import *
 
 Any = [list, dict, int, float, str]
@@ -32,33 +33,38 @@ def module_creator(backbone, head, print_status, ic_backbone):
     if print_status:
         print('BackBone Module **')
     for i, b in enumerate(backbone):
+        sva = i
         form = b[0]
+        rank = b[1]
         name = b[2]
         attr = attr_exist_check_(b, 3)
         ic_backbone = ic_backbone * len(form) if name == 'Concat' else ic_backbone
         model.append(
             name_to_layer(name=name, attr=attr, prefix=ic_backbone, in_case_prefix_use=in_case_prefix_use, form=form,
                           print_debug=print_status))
-        sva = i
+        print_model(name,attr,form=form,rank=rank,index=sva)
         if name in in_case_prefix_use:
             ic_backbone = attr[0]
         save.extend(x % i for x in ([form] if isinstance(form, int) else form) if x != -1)
     ic_head = ic_backbone
+
     if print_status:
         print('Head Module **')
     for i, h in enumerate(head):
         form = h[0]
+        rank = h[1]
         name = h[2]
+        sva+=1
         attr = attr_exist_check_(h, 3)
         ic_head = ic_head * len(form) if name == 'Concat' else ic_head
         model.append(
             name_to_layer(name=name, attr=attr, prefix=ic_head, in_case_prefix_use=in_case_prefix_use, form=form,
                           print_debug=print_status))
+        print_model(name,attr,form=form,rank=rank,index=sva)
         if name in in_case_prefix_use:
             ic_head = attr[0]
         save.extend(x % (i + sva) for x in ([form] if isinstance(form, int) else form) if x != -1)
 
-    print()
 
     return model, save
 

@@ -18,7 +18,5 @@ class Cd(Dataset):
 
 
 if __name__ == "__main__":
-    net = ObjectDetectorModule(cfg='cfg/tiny.yaml')
+    net = ObjectDetectorModule(cfg='cfg/objd-n.yaml')
 
-    trainer = pl.Trainer()
-    trainer.fit(net, DataLoader(Cd()))

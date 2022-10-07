@@ -29,7 +29,7 @@ class ObjectDetectorModule(pl.LightningModule):
         self.nc = data['nc']
         bone_list, head_list = data['backbone'], data['head']
         self.model, self.save = module_creator(
-            bone_list, head_list, True,
+            bone_list, head_list, False,
             3, )  # backbone list , head list , print Status, image channel backbone and head
 
     def size(self):
