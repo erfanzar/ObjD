@@ -16,7 +16,8 @@ DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 class ObjectDetectorModule(pl.LightningModule):
     def __init__(self, cfg: str = 'cfg/tiny.yaml'):
         super(ObjectDetectorModule, self).__init__()
-        self.layers_head, self.layers_bone, self.nc, self.cfg, self.fr = None, None, 1, cfg, False
+        self.save = None
+        self.model, self.nc, self.cfg, self.fr = None, 1, cfg, False
         self.layer_creator()
         self.to(DEVICE)
         self.loss = Loss()
@@ -27,8 +28,8 @@ class ObjectDetectorModule(pl.LightningModule):
             data = yaml.full_load(r)
         self.nc = data['nc']
         bone_list, head_list = data['backbone'], data['head']
-        self.layers_bone, self.layers_head = module_creator(
-            bone_list, head_list, True, 3,
+        self.model, self.save = module_creator(
+            bone_list, head_list, True,
             3, )  # backbone list , head list , print Status, image channel backbone and head
 
     def size(self):
@@ -40,15 +41,14 @@ class ObjectDetectorModule(pl.LightningModule):
         print('-' * 50)
         print(f' TOTAL SIZE  :  {ps} MB')
 
-    def back_forward(self, x):
-        x = [x]
-        for i, layer in enumerate(self.layers_bone):
-            x = layer(x)
-            # print(i)
+    def forward(self, x):
+        route = []
+        for i, m in enumerate(self.model):
+            if m.form != -1:
+                x = route[m.form] if isinstance(m.form, int) else [x if j == -1 else route[j] for j in m.form]
+            x = m(x)
+            route.append(x if i in self.save else None)
         return x
-
-    def head_forward(self, x):
-        pass
 
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.parameters(), lr=1e-4)

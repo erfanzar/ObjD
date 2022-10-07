@@ -22,38 +22,45 @@ def name_to_layer(name: str, attr: Any = None, in_case_prefix_use=None, prefix: 
     return model
 
 
-def module_creator(backbone, head, print_status, ic_backbone,
-                   ic_head):
-    backbone_m = nn.ModuleList()
-    head_m = nn.ModuleList()
+def module_creator(backbone, head, print_status, ic_backbone):
+    model = nn.ModuleList()
+
+    save = []
+    sv_bb = []
     in_case_prefix_use = ['Conv']
+    sva = 0
     if print_status:
         print('BackBone Module **')
-    for b in backbone:
+    for i, b in enumerate(backbone):
         form = b[0]
         name = b[2]
         attr = attr_exist_check_(b, 3)
         ic_backbone = ic_backbone * len(form) if name == 'Concat' else ic_backbone
-        backbone_m.append(
+        model.append(
             name_to_layer(name=name, attr=attr, prefix=ic_backbone, in_case_prefix_use=in_case_prefix_use, form=form,
                           print_debug=print_status))
+        sva = i
         if name in in_case_prefix_use:
             ic_backbone = attr[0]
-
+        save.extend(x % i for x in ([form] if isinstance(form, int) else form) if x != -1)
+    ic_head = ic_backbone
     if print_status:
         print('Head Module **')
-    for h in head:
+    for i, h in enumerate(head):
         form = h[0]
         name = h[2]
         attr = attr_exist_check_(h, 3)
         ic_head = ic_head * len(form) if name == 'Concat' else ic_head
-        head_m.append(
+        model.append(
             name_to_layer(name=name, attr=attr, prefix=ic_head, in_case_prefix_use=in_case_prefix_use, form=form,
                           print_debug=print_status))
         if name in in_case_prefix_use:
             ic_head = attr[0]
+        save.extend(x % (i + sva) for x in ([form] if isinstance(form, int) else form) if x != -1)
 
-    return backbone_m, head_m
+    print()
+
+    return model, save
 
 
 def attr_exist_check_(attr, index):
@@ -62,3 +69,17 @@ def attr_exist_check_(attr, index):
     except IndexError:
         s = []
     return s
+
+
+def iou(box1, box2):
+    xma = max(box1[0], box2[0])
+    yma = max(box1[1], box2[1])
+    xmi = min(box1[2], box2[2])
+    ymi = min(box1[3], box2[3])
+
+    i_area = abs(max(xma - xmi, 0) * max(yma - ymi, 0))
+
+    box1_area = abs((box1[2] - box1[0]) * (box1[3] - box1[1]))
+    box2_area = abs((box2[2] - box2[0]) * (box2[3] - box2[1]))
+    result = i_area / float(box2_area + box1_area - i_area)
+    return result

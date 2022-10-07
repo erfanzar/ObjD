@@ -5,7 +5,7 @@ import torch
 import torch.optim as optim
 from colorama import Fore
 from module.loss import Loss
-from module.ObjectDetectorModule import ObjectDetectorModule
+from module.object_detector_module import ObjectDetectorModule
 from utils.dataset import DataReader, DataLoaderLightning
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import BackboneFinetuning, Checkpoint, LearningRateMonitor, ModelCheckpoint, Timer, \
@@ -29,7 +29,7 @@ class TrainDi:
 
 class OldMethodTrain(TrainDi):
     def __init__(self, nc: int = 4, cfg_path: str = 'cfg.yaml'):
-        super(Train, self).__init__()
+        super(OldMethodTrain, self).__init__()
         self.nc = nc
         self.cfg_path = cfg_path
         self.net = ObjectDetectorModule(nc=nc, cfg_path=cfg_path).to(self.DEVICE)

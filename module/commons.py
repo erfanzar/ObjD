@@ -24,20 +24,18 @@ class Conv(pl.LightningModule):
         self.batch_norm = nn.BatchNorm2d(c2)
 
     def forward(self, x) -> T.Tensor:
-        x.append(self.batch_norm(self.activation(self.conv(x[self.form]))))
+        x = self.batch_norm(self.activation(self.conv(x)))
         return x
 
 
 class Concat(pl.LightningModule):
-    def __init__(self, dim, major):
+    def __init__(self, dim, form):
         super(Concat, self).__init__()
-        self.major = major
+        self.form = form
         self.dim = dim
 
     def forward(self, x):
-        c = [x[d] for d in self.major]
-        x.append(torch.cat(c, self.dim))
-        return x
+        return torch.cat(x, self.dim)
 
 
 class Neck(pl.LightningModule):
@@ -198,7 +196,7 @@ class MP(pl.LightningModule):
         self.m = nn.MaxPool2d(kernel_size=k, stride=k)
 
     def forward(self, x):
-        x.append(self.m(x[self.form]))
+        x = self.m(x)
         return x
 
 
@@ -209,7 +207,7 @@ class SP(pl.LightningModule):
         self.m = nn.MaxPool2d(kernel_size=k, stride=s, padding=k // 2)
 
     def forward(self, x):
-        x.append(self.m(x[self.form]))
+        x = self.m(x)
         return x
 
 
@@ -223,11 +221,33 @@ class LP(pl.LightningModule):
 
 
 class UpSample(pl.LightningModule):
-    def __init__(self, s, m, form: int = -1):
+    def __init__(self, s: int = 2, m: str = 'nearest', form: int = -1):
         super(UpSample, self).__init__()
         self.form = form
         self.u = nn.Upsample(scale_factor=s, mode=m)
 
     def forward(self, x):
-        x.append(self.u(x[self.form]))
+        x = self.u(x)
+        return x
+
+
+class SPPCSPC(nn.Module):
+
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5, k=(5, 9, 13)):
+        super(SPPCSPC, self).__init__()
+        c_ = int(2 * c2 * e)
+        self.cv1 = Conv(c1, c_, 1, 1)
+        self.cv2 = Conv(c1, c_, 1, 1)
+        self.cv3 = Conv(c_, c_, 3, 1)
+        self.cv4 = Conv(c_, c_, 1, 1)
+        self.m = nn.ModuleList([nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k])
+        self.cv5 = Conv(4 * c_, c_, 1, 1)
+        self.cv6 = Conv(c_, c_, 3, 1)
+        self.cv7 = Conv(2 * c_, c2, 1, 1)
+
+    def forward(self, x):
+        x1 = self.cv4(self.cv3(self.cv1(x)))
+        y1 = self.cv6(self.cv5(torch.cat([x1] + [m(x1) for m in self.m], 1)))
+        y2 = self.cv2(x)
+        x = self.cv7(torch.cat((y1, y2), dim=1))
         return x

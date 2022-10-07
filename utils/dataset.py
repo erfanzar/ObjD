@@ -6,7 +6,7 @@ import torch
 import torch as T
 import yaml
 from PIL import Image
-from .utils import iou_width_height
+from .anchor_predict import anchor_prediction
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
 
@@ -61,6 +61,8 @@ class DataLoaderLightning(LightningDataModule):
 
     def __start__(self, current, is_val: bool = False):
         xsl, ysl = [], []
+        wax = []
+        way = []
         path = self.path_valid if is_val else self.path_train
         tm = len(current) if not self.debug else int(len(current) * (self.prc if not is_val else self.val_perc))
         print(f"Loading {tm} Samples")
@@ -76,6 +78,8 @@ class DataLoaderLightning(LightningDataModule):
             targets = [torch.zeros(1, S, S, 5 + self.nc) for S in self.s]
             for box in bboxes:
                 x1, y1, w, h, class_index = box
+                wax.append(int(w * self.img_shape))
+                way.append(int(h * self.img_shape))
                 for index, st in enumerate(self.s):
                     x_i, y_i, w_i, h_i = int(x1 * st), int(y1 * st), int(w * st), int(h * st)
                     ca = torch.zeros(self.nc)[int(class_index)] == 1
@@ -97,12 +101,17 @@ class DataLoaderLightning(LightningDataModule):
             image_rgb = np.array(image_pixel).reshape((self.img_shape, self.img_shape, 3))
             image_bgr = image_rgb[:, :, ::-1]
             x = ts(tn(tt(to_tensor(image_rgb)))).permute(2, 1, 0).reshape(3, self.img_shape, self.img_shape)
-            x = x.type(T.cuda.FloatTensor) if DEVICE == 'cuda:0' else x.type(T.FloatTensor)
+            # x = x.type(T.cuda.FloatTensor) if DEVICE == 'cuda:0' else x.type(T.FloatTensor)
+            x = x.cpu()
             xsl.append(x)
             ysl.append(tuple(targets))
             sys.stdout.write('\r Moving Data To Ram Or Gpu %{} remaining '.format(
                 f"{((item / tm) * 100):.4f}"))
         sys.stdout.write('\n')
+        anchors = anchor_prediction(wax, way, n_clusters=9, original_height=self.img_shape,
+                                    original_width=self.img_shape, c_number=self.img_shape)
+        with open('anchors.txt', 'a') as w:
+            w.write(f"{anchors.tolist()}")
         return xsl, ysl
 
     def train_dataloader(self):

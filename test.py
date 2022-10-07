@@ -1,8 +1,24 @@
 import torch
 
 from module.object_detector_module import ObjectDetectorModule
+from utils.dataset import DataLoaderLightning
+import pytorch_lightning as pl
+from torch.utils.data import Dataset, DataLoader
+
+
+class Cd(Dataset):
+    def __init__(self):
+        pass
+
+    def __len__(self):
+        return 2
+
+    def __getitem__(self, item):
+        return torch.zeros(( 3, 640, 640)), torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0])
+
 
 if __name__ == "__main__":
-    model = ObjectDetectorModule(cfg='cfg/tiny.yaml')
-    x = torch.zeros((1, 3, 416, 416)).to('cuda:0')
-    x = model.back_forward(x)
+    net = ObjectDetectorModule(cfg='cfg/tiny.yaml')
+
+    trainer = pl.Trainer()
+    trainer.fit(net, DataLoader(Cd()))
