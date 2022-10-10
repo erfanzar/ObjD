@@ -8,7 +8,7 @@ Any = [list, dict, int, float, str]
 
 def name_to_layer(name: str, attr: Any = None, in_case_prefix_use=None, prefix: Any = None,
                   form: [list, int] = -1,
-                  print_debug: bool = True):
+                  print_debug: bool = True, nc: int = 4, anchors: list = None):
     if in_case_prefix_use is None:
         in_case_prefix_use = []
     attr = [attr] if isinstance(attr, int) else attr
@@ -23,7 +23,7 @@ def name_to_layer(name: str, attr: Any = None, in_case_prefix_use=None, prefix: 
     return model
 
 
-def module_creator(backbone, head, print_status, ic_backbone):
+def module_creator(backbone, head, print_status, ic_backbone, nc, anchors):
     model = nn.ModuleList()
 
     save = []
@@ -41,30 +41,29 @@ def module_creator(backbone, head, print_status, ic_backbone):
         ic_backbone = ic_backbone * len(form) if name == 'Concat' else ic_backbone
         model.append(
             name_to_layer(name=name, attr=attr, prefix=ic_backbone, in_case_prefix_use=in_case_prefix_use, form=form,
-                          print_debug=print_status))
-        print_model(name,attr,form=form,rank=rank,index=sva)
+                          print_debug=print_status, nc=nc, anchors=anchors))
+        print_model(name, attr, form=form, rank=rank, index=sva)
         if name in in_case_prefix_use:
             ic_backbone = attr[0]
         save.extend(x % i for x in ([form] if isinstance(form, int) else form) if x != -1)
-    ic_head = ic_backbone
 
+    ic_head = ic_backbone
+    sva += 1
     if print_status:
         print('Head Module **')
     for i, h in enumerate(head):
         form = h[0]
         rank = h[1]
         name = h[2]
-        sva+=1
         attr = attr_exist_check_(h, 3)
         ic_head = ic_head * len(form) if name == 'Concat' else ic_head
         model.append(
             name_to_layer(name=name, attr=attr, prefix=ic_head, in_case_prefix_use=in_case_prefix_use, form=form,
-                          print_debug=print_status))
-        print_model(name,attr,form=form,rank=rank,index=sva)
+                          print_debug=print_status, nc=nc, anchors=anchors))
+        print_model(name, attr, form=form, rank=rank, index=i + sva)
         if name in in_case_prefix_use:
             ic_head = attr[0]
         save.extend(x % (i + sva) for x in ([form] if isinstance(form, int) else form) if x != -1)
-
 
     return model, save
 
