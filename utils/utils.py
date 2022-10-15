@@ -2,8 +2,15 @@ import torch.nn as nn
 import torch
 from .logger import print_model
 from module.commons import *
+import sys
 
 Any = [list, dict, int, float, str]
+
+
+def printf(*args, end: bool = False):
+    sys.stdout.write(''.join(f'{a}' for a in args))
+    if end:
+        print('\n')
 
 
 def name_to_layer(name: str, attr: Any = None, in_case_prefix_use=None, prefix: Any = None,
@@ -77,14 +84,16 @@ def attr_exist_check_(attr, index):
 
 
 def iou(box1, box2):
-    xma = max(box1[0], box2[0])
-    yma = max(box1[1], box2[1])
-    xmi = min(box1[2], box2[2])
-    ymi = min(box1[3], box2[3])
+    print(box1)
+    print(box2)
+    xma = max(box1[..., 0], box2[..., 0])
+    yma = max(box1[..., 1], box2[..., 1])
+    xmi = min(box1[..., 2], box2[..., 2])
+    ymi = min(box1[..., 3], box2[..., 3])
 
     i_area = abs(max(xma - xmi, 0) * max(yma - ymi, 0))
 
-    box1_area = abs((box1[2] - box1[0]) * (box1[3] - box1[1]))
-    box2_area = abs((box2[2] - box2[0]) * (box2[3] - box2[1]))
+    box1_area = abs((box1[..., 2] - box1[..., 0]) * (box1[..., 3] - box1[..., 1]))
+    box2_area = abs((box2[..., 2] - box2[..., 0]) * (box2[..., 3] - box2[..., 1]))
     result = i_area / float(box2_area + box1_area - i_area)
     return result

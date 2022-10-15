@@ -1,49 +1,69 @@
+import time
+
 import cv2 as cv
 import torch
 import torch.nn as nn
 import torch.jit as jit
 import argparse
 import numpy as np
-import onnx
-import onnxruntime
-import keyboard
+import onnxruntime as rt
+from utils.utils import printf
 
 pars = argparse.ArgumentParser()
-pars.add_argument('-p', '--path')
-pars.add_argument('-s', '--source')
+pars.add_argument('--path', '--path')
+pars.add_argument('--source', '--source', default=0)
+pars.add_argument('--img-size', '--img_size', default=640)
+pars.add_argument('--weights', '--weights', default='best.torchscript.pt')
+args = pars.parse_args()
+pars.print_usage()
 
-opt = pars.parse_args()
 
-# model = jit.load('last.torchscript.pt', 'cuda:0')
+def check_available_cameras():
+    index = 0
+    arr = []
+    while True:
+        cap = cv.VideoCapture(index)
+        if not cap.read()[0]:
+            break
+        else:
+            arr.append(index)
+        cap.release()
+        index += 1
+    return arr
 
-cam = cv.VideoCapture(0)
+
+def detect(opt):
+    cam = cv.VideoCapture(opt.source)
+    t1 = time.time()
+    h_w = opt.img_size
+    if opt.weights.endswith('.onnx'):
+        printf('Onnx Model Deploying .... ')
+        model = rt.InferenceSession(opt.weights, providers=['CPUExecutionProvider'])
+        while True:
+            status, fr = cam.read()
+            # printf(f' \r Status : {status}')
+            x = cv.cvtColor(fr, cv.COLOR_BGR2RGB)
+            x = cv.resize(x / 255, (h_w, h_w))
+
+            x = x.reshape(1, 3, h_w, h_w).astype(np.float32)
+
+            x = model.run(['output'], {'images': x})
+            # printf(f' \r {x[0].shape}')
+            x = x[0]
+
+            v = x[:, :, 4] > 0.60
+
+            printf(f' \r {x[v]}')
+            cv.imshow('windows', fr)
+            cv.waitKey(1)
+            if cv.waitKey(1) == ord('q'):
+                printf(f' \n Total Estimated time : {time.time() - t1:.2f} sec')
+                break
+
+    if opt.weights.endswith('.torchscript.pt'):
+        printf('Torch Script Model Deploying ....')
+
 
 if __name__ == "__main__":
-    model = onnxruntime.InferenceSession('last.onnx')
-
-    # model = onnx.load_model('last.onnx')
-    # print(*(v.name for v in model.get_inputs()))
-    # print(*(v.shape for v in model.get_inputs()))
-    # print(*(v.name for v in model.get_outputs()))
-    # print(*(v.shape for v in model.get_outputs()))
-    while True:
-
-        _, frame = cam.read()
-        # inp = frame / 255
-        inp = (frame / 255)
-        inp = cv.resize(inp, (640, 640))
-
-        inp[:, :, [0, 1, 2]] = inp[:, :, [2, 1, 0]]
-        # inp = torch.cuda.FloatTensor(inp.float())
-        inp = np.float32(inp).reshape(1, 3, 640, 640)
-
-        res = model.run(['output'], {'images': inp})
-        cv.imshow('windows', frame)
-        res = res[0]
-        print(res.shape)
-        for i in range(res.shape[1]):
-            if res[0, i, 4].tolist() > 0.3:
-                print(res[0, i, 5:])
-        if keyboard.is_pressed('q'):
-            break
-        cv.waitKey(1)
+    printf(f'There is available cameras : {len(check_available_cameras())}')
+    detect(args)
