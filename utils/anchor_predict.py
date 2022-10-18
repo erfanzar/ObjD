@@ -9,6 +9,7 @@ def anchor_prediction(w: list, h: list, n_clusters: int, original_height: int = 
     x = [w, h]
     x = np.asarray(x)
     x = np.transpose(x)
+    print(x.shape)
     k_mean = KMeans(n_clusters=n_clusters)
     k_mean.fit(x)
     predicted_anchors = k_mean.predict(x)

@@ -9,12 +9,13 @@ from .commons import (Conv, Detect, ResidualBlock, Neck, C3, C4P, MP, UC1, CV1, 
 import pytorch_lightning as pl
 from torchmetrics.functional import accuracy
 from utils.utils import module_creator
+from .loss import ComputeLoss
 
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 
 class ObjectDetectorModule(pl.LightningModule):
-    def __init__(self, cfg: str = 'cfg/tiny.yaml'):
+    def __init__(self, cfg: str = 'cfg/objd-n.yaml'):
         super(ObjectDetectorModule, self).__init__()
         self.anchors = None
         self.save = None
@@ -23,6 +24,7 @@ class ObjectDetectorModule(pl.LightningModule):
         self.to(DEVICE)
         # self.loss = ComputeLoss(self.model)
         self.save_hyperparameters()
+        self.loss = ComputeLoss(self.model)
 
     def layer_creator(self):
         with open(self.cfg, 'r') as r:
@@ -45,13 +47,14 @@ class ObjectDetectorModule(pl.LightningModule):
         print(f' TOTAL SIZE  :  {ps} MB')
 
     def forward(self, x):
+        x = x.float()
         route = []
         for i, m in enumerate(self.model):
             if m.form != -1:
                 x = route[m.form] if isinstance(m.form, int) else [x if j == -1 else route[j] for j in m.form]
-            print(
-                f'Running : {type(m).__name__} index : {i} x : '
-                f'{x.shape if not isinstance(x, list) else [*(v.shape for v in x)]}')
+            # print(
+            #     f'Running : {type(m).__name__} index : {i} x : '
+            #     f'{x.shape if not isinstance(x, list) else [*(v.shape for v in x)]}')
             x = m(x)
 
             route.append(x if i in self.save else None)
@@ -67,25 +70,19 @@ class ObjectDetectorModule(pl.LightningModule):
 
     def training_step(self, batch, batch_index):
         x, y = batch
+        y = y.view(-1,6)
         x_ = self(x)
-        # loss = (self.loss.forward(x_[0], y[0]) +
-        #         self.loss.forward(x_[1], y[1]) +
-        #         self.loss.forward(x_[2], y[2])
-        #         )
+        loss = self.loss(x_, y)
 
-        # self.log('train_loss', loss, prog_bar=True, on_step=False,
-        #          on_epoch=True)
-        return 1
+        self.log('lbox', loss[1][0], prog_bar=True, on_step=True)
+        self.log('lobj', loss[1][1], prog_bar=True, on_step=True)
+        self.log('lcls', loss[1][2], prog_bar=True, on_step=True)
+        self.log('loss', loss[1][3], prog_bar=True, on_step=True)
+        return loss[0]
 
     def validation_step(self, batch, batch_index):
         x, y = batch
+        y = y.view(-1, 6)
         x_ = self(x)
-        #
-        # loss = (self.loss.forward(x_[0], y[0]) +
-        #         self.loss.forward(x_[1], y[1]) +
-        #         self.loss.forward(x_[2], y[2])
-        #         )
-        # self.log('val_loss', loss, prog_bar=True, on_step=False,
-        #          on_epoch=True)
-
-        return 1
+        loss = self.loss(x_, y)
+        return loss[0]

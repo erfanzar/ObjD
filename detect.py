@@ -66,17 +66,12 @@ def detect(opt):
         while True:
             status, fr = cam.read()
             fr = cv.clip(fr, 1)
-            # printf(f' \r Status : {status}')
             x = cv.cvtColor(fr, cv.COLOR_BGR2RGB)
             x = cv.resize(x / 255, (h_w, h_w))
-
             x = x.reshape(1, 3, h_w, h_w).astype(np.float32)
             x = torch.from_numpy(x)
             x = model(x)
-
             x = x[0].view(-1, 9)
-
-            res = []
             res.append(i if xs[4] > 0.45 else None for i, xs in x)
             cv.imshow('windows', fr)
             cv.waitKey(1)

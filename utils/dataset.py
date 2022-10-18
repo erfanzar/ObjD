@@ -6,11 +6,10 @@ import torch
 import torch as T
 import yaml
 from PIL import Image
-from .anchor_predict import anchor_prediction
+# from .anchor_predict import anchor_prediction
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
 from utils.utils import iou
-
 
 DEVICE = 'cuda:0' if T.cuda.is_available() else 'cpu'
 
@@ -31,7 +30,7 @@ class DataReader(Dataset):
 
 class DataLoaderLightning(LightningDataModule):
     def __init__(self, path, debug: bool = False, nc: int = 4, val_pers=0.3, batch_size: int = 6, prc: float = 0.3,
-                 img_shape: int = 416, val_perc: float = 0.9, anchors: list = None):
+                 img_shape: int = 640):
         super(DataLoaderLightning, self).__init__()
         with open(path, 'r') as r:
             iw = yaml.full_load(r)
@@ -41,11 +40,10 @@ class DataLoaderLightning(LightningDataModule):
         self.val_pers = val_pers
         self.batch_size = batch_size
         self.img_shape = img_shape
-        self.val_perc = val_perc
+        self.val_perc = val_pers
         self.debug = debug
         self.prc = prc
-        self.anchors = torch.tensor(anchors)
-        self.nl = len(anchors[0]) // 2
+
         self.path_train = os.path.join(os.getcwd(), iw['train'])
         self.path_valid = os.path.join(os.getcwd(), iw['valid'])
         # self.path_train = iw['train']
@@ -81,12 +79,15 @@ class DataLoaderLightning(LightningDataModule):
             bboxes = np.roll(
                 np.loadtxt(f'{path}/{current[item][:-4]}.txt', delimiter=" ", ndmin=2, ), 4,
                 axis=1).tolist() if len(sr) != 0 else []
-            targets = torch.tensor([0, 0, 0, 0, 0, 0])
-            for box in bboxes:
+            targets = torch.zeros((len(bboxes), 6))
+            for i, box in enumerate(bboxes):
                 x1, y1, w, h, class_index = box
-                targets[:] = torch.tensor([0, class_index, x1, y1, w, h])
-                wax.append(int(w * self.img_shape))
-                way.append(int(h * self.img_shape))
+                w += x1
+                h += y1
+                targets[i, :] = torch.tensor([item, class_index, x1, y1, w, h])
+                # wax.append(int(w * self.img_shape))
+                # way.append(int(h * self.img_shape))
+
             img = Image.open(f'{path}/{current[item][:-4]}.jpg')
             to_tensor = lambda ten: torch.from_numpy(ten)
             tt, tn, ts = [lambda xf: xf.type(T.float64), lambda xr: xr / 255, lambda xs: xs.reshape(
@@ -99,23 +100,24 @@ class DataLoaderLightning(LightningDataModule):
             # x = x.type(T.cuda.FloatTensor) if DEVICE == 'cuda:0' else x.type(T.FloatTensor)
             x = x.cpu()
             xsl.append(x)
-            ysl.append(tuple(targets))
+            ysl.append(targets.cpu())
             sys.stdout.write('\r Moving Data To Ram Or Gpu %{} remaining '.format(
                 f"{((item / tm) * 100):.4f}"))
         sys.stdout.write('\n')
-        anchors = anchor_prediction(wax, way, n_clusters=9, original_height=self.img_shape,
-                                    original_width=self.img_shape, c_number=self.img_shape)
-        if not is_val:
-            with open('anchors.txt', 'a') as w:
-                w.write(f"{anchors.tolist()}")
+        # anchors = anchor_prediction(wax, way, n_clusters=9, original_height=self.img_shape,
+        #                             original_width=self.img_shape, c_number=self.img_shape)
+        # if not is_val:
+        #     with open('anchors.txt', 'a') as w:
+        #         w.write(f"{anchors.tolist()}")
         return xsl, ysl
 
     def train_dataloader(self):
         del self.ti
         data_train = DataReader(self.x_train, self.y_train)
-        return DataLoader(data_train, batch_size=self.batch_size, num_workers=2)
+        return DataLoader(data_train, batch_size=self.batch_size, num_workers=1)
 
     def val_dataloader(self):
         del self.vi
         data_val = DataReader(self.x_val, self.y_val)
-        return DataLoader(data_val, batch_size=self.batch_size, num_workers=2)
+        return DataLoader(data_val, batch_size=self.batch_size, num_workers=1
+                          )
