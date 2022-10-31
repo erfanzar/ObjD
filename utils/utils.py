@@ -8,8 +8,31 @@ import math
 Any = [list, dict, int, float, str]
 
 
+class Cp:
+    Type = 1
+    BLACK = f'\033[{Type};30m'
+    RED = f'\033[{Type};31m'
+    GREEN = f'\033[{Type};32m'
+    YELLOW = f'\033[{Type};33m'
+    BLUE = f'\033[{Type};34m'
+    MAGENTA = f'\033[{Type};35m'
+    CYAN = f'\033[{Type};36m'
+    WHITE = f'\033[{Type};1m'
+    RESET = f"\033[{Type};39m"
+
+
+def is_parallel(model):
+    # Returns True if model is of type DP or DDP
+    return type(model) in (nn.parallel.DataParallel, nn.parallel.DistributedDataParallel)
+
+
+def de_parallel(model):
+    # De-parallelize a model: returns single-GPU model if model is of type DP or DDP
+    return model.module if is_parallel(model) else model
+
+
 def printf(*args, end: bool = False):
-    sys.stdout.write(''.join(f'{a}' for a in args))
+    sys.stdout.write('\033[1;36m'.join(f'{a}' for a in args))
     if end:
         print('\n')
 
@@ -38,8 +61,7 @@ def module_creator(backbone, head, print_status, ic_backbone, nc, anchors):
     sv_bb = []
     in_case_prefix_use = ['Conv']
     sva = 0
-    if print_status:
-        print('BackBone Module **')
+
     for i, b in enumerate(backbone):
         sva = i
         form = b[0]
@@ -50,15 +72,15 @@ def module_creator(backbone, head, print_status, ic_backbone, nc, anchors):
         model.append(
             name_to_layer(name=name, attr=attr, prefix=ic_backbone, in_case_prefix_use=in_case_prefix_use, form=form,
                           print_debug=print_status, nc=nc, anchors=anchors))
-        print_model(name, attr, form=form, rank=rank, index=sva)
+        if not print_status:
+            print_model(name, attr, form=form, rank=rank, index=sva)
         if name in in_case_prefix_use:
             ic_backbone = attr[0]
         save.extend(x % i for x in ([form] if isinstance(form, int) else form) if x != -1)
 
     ic_head = ic_backbone
     sva += 1
-    if print_status:
-        print('Head Module **')
+
     for i, h in enumerate(head):
         form = h[0]
         rank = h[1]
@@ -68,7 +90,8 @@ def module_creator(backbone, head, print_status, ic_backbone, nc, anchors):
         model.append(
             name_to_layer(name=name, attr=attr, prefix=ic_head, in_case_prefix_use=in_case_prefix_use, form=form,
                           print_debug=print_status, nc=nc, anchors=anchors))
-        print_model(name, attr, form=form, rank=rank, index=i + sva)
+        if not print_status:
+            print_model(name, attr, form=form, rank=rank, index=i + sva)
         if name in in_case_prefix_use:
             ic_head = attr[0]
         save.extend(x % (i + sva) for x in ([form] if isinstance(form, int) else form) if x != -1)
@@ -101,7 +124,6 @@ def iou(box1, box2):
 
 
 def bbox_iou(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=False, eps=1e-7):
-    box1, box2 = box1.cpu(), box2.cpu()
     # Returns the IoU of box1 to box2. box1 is 4, box2 is nx4
     box2 = box2.T
 

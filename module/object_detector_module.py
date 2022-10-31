@@ -15,16 +15,16 @@ DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 
 class ObjectDetectorModule(pl.LightningModule):
-    def __init__(self, cfg: str = 'cfg/objd-n.yaml'):
+    def __init__(self, cfg: str = 'cfg/objd-s.yaml'):
         super(ObjectDetectorModule, self).__init__()
         self.anchors = None
         self.save = None
-        self.model, self.nc, self.cfg, self.fr = None, 1, cfg, False
+        self.m, self.nc, self.cfg, self.fr = None, 1, cfg, False
         self.layer_creator()
         self.to(DEVICE)
-        # self.loss = ComputeLoss(self.model)
+        # self.loss = ComputeLoss(self.m)
         self.save_hyperparameters()
-        self.loss = ComputeLoss(self.model)
+        self.loss = ComputeLoss(self.m)
 
     def layer_creator(self):
         with open(self.cfg, 'r') as r:
@@ -32,7 +32,7 @@ class ObjectDetectorModule(pl.LightningModule):
         self.nc = data['nc']
         self.anchors = data['anchors']
         bone_list, head_list = data['backbone'], data['head']
-        self.model, self.save = module_creator(
+        self.m, self.save = module_creator(
             bone_list, head_list, False,
             3, nc=self.nc,
             anchors=self.anchors)  # backbone list , head list , print Status, image channel backbone and head
@@ -49,14 +49,11 @@ class ObjectDetectorModule(pl.LightningModule):
     def forward(self, x):
         x = x.float()
         route = []
-        for i, m in enumerate(self.model):
+
+        for i, m in enumerate(self.m):
             if m.form != -1:
                 x = route[m.form] if isinstance(m.form, int) else [x if j == -1 else route[j] for j in m.form]
-            # print(
-            #     f'Running : {type(m).__name__} index : {i} x : '
-            #     f'{x.shape if not isinstance(x, list) else [*(v.shape for v in x)]}')
             x = m(x)
-
             route.append(x if i in self.save else None)
         return x
 
@@ -70,7 +67,7 @@ class ObjectDetectorModule(pl.LightningModule):
 
     def training_step(self, batch, batch_index):
         x, y = batch
-        y = y.view(-1,6)
+        y = y.view(-1, 6).to(self.device)
         x_ = self(x)
         loss = self.loss(x_, y)
 
@@ -78,11 +75,12 @@ class ObjectDetectorModule(pl.LightningModule):
         self.log('lobj', loss[1][1], prog_bar=True, on_step=True)
         self.log('lcls', loss[1][2], prog_bar=True, on_step=True)
         self.log('loss', loss[1][3], prog_bar=True, on_step=True)
+        self.log('train_loss', loss[0])
         return loss[0]
 
     def validation_step(self, batch, batch_index):
         x, y = batch
-        y = y.view(-1, 6)
+        y = y.view(-1, 6).to(self.device)
         x_ = self(x)
         loss = self.loss(x_, y)
         return loss[0]

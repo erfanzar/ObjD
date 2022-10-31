@@ -24,9 +24,9 @@ class LightningTrain:
         lr_monitor = LearningRateMonitor(logging_interval='step')
         # early_stopping = EarlyStopping('Loss')
         timer = Timer(duration='01:00:00:00' if time is None else time)
-        trainer = pl.Trainer(accelerator='cpu', min_epochs=50, max_epochs=50000, auto_lr_find=True,
+        trainer = pl.Trainer(accelerator='gpu', min_epochs=50, max_epochs=200, auto_lr_find=True,
                              callbacks=[model_summery, model_checkpoint, checkpoint, lr_monitor, timer])
-        data_loader_lightning = DataLoaderLightning(path='data/path.yaml', debug=True, val_pers=0.01, nc=4, prc=0.01,
+        data_loader_lightning = DataLoaderLightning(path='data/path.yaml', debug=True, val_pers=0.1, nc=4, prc=0.01,
                                                     batch_size=1)
         dataloader_train = data_loader_lightning.train_dataloader()
         dataloader_validation = data_loader_lightning.val_dataloader()
