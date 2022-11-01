@@ -58,11 +58,13 @@ class ComputeLoss(pl.LightningModule):
             setattr(self, k, getattr(det, k))
 
     def __call__(self, p, targets):
-        device = targets[0].device if isinstance(targets, list) else targets.device
+        device = p[0].device if isinstance(p, list) else p.device
+        # device = targets[0].device if isinstance(targets, list) else targets.device
         lcls, lbox, lobj = torch.zeros(1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
 
         tcls, tbox, indices, anchors = self.build_targets(p, targets)  # targets
-        targets = targets
+
+        targets = targets.to(device)
         # Losses
         for i, pi in enumerate(p):  # layer index, layer predictions
 
@@ -73,13 +75,13 @@ class ComputeLoss(pl.LightningModule):
             n = b.shape[0]  # number of targets
 
             if n:
-                ps = pi[b, a, gj, gi]  # prediction subset corresponding to targets
+                ps = pi[b, a, gj, gi].to(device)  # prediction subset corresponding to targets
 
                 # Regression
                 pxy = ps[:, :2].sigmoid() * 2. - 0.5
-                pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i]
+                pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i].to(device)
                 pbox = torch.cat((pxy, pwh), 1)  # predicted box
-                iou = bbox_iou(pbox.T, tbox[i], x1y1x2y2=False, CIoU=True)  # iou(prediction, target)
+                iou = bbox_iou(pbox.T.to(device), tbox[i].to(device), x1y1x2y2=False, CIoU=True)  # iou(prediction, target)
                 iou = iou.to(device)
                 lbox += (1.0 - iou).mean()  # iou loss
 

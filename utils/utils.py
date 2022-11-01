@@ -2,7 +2,9 @@ import torch.nn as nn
 import torch
 from .logger import print_model
 from module.commons import *
+import numba as nb
 import sys
+import numpy as np
 import math
 
 Any = [list, dict, int, float, str]
@@ -56,50 +58,39 @@ def name_to_layer(name: str, attr: Any = None, in_case_prefix_use=None, prefix: 
 
 def module_creator(backbone, head, print_status, ic_backbone, nc, anchors):
     model = nn.ModuleList()
-
-    save = []
-    sv_bb = []
-    in_case_prefix_use = ['Conv']
-    sva = 0
-    k = 0
-    for i, b in enumerate(backbone):
-        sva = i
-        form = b[0]
-        rank = b[1]
-        k += 1
-        name = b[2]
-        attr = attr_exist_check_(b, 3)
+    save, sv_bb, in_case_prefix_use = [], [], ['Conv']
+    model_list = backbone + head
+    sva, idx = 0, 0
+    for i, at in enumerate(model_list):
+        form, times, name = at[0], at[1], at[2]
+        attr = attr_exist_check_(at, 3)
         ic_backbone = ic_backbone * len(form) if name == 'Concat' else ic_backbone
-        model.append(
-            name_to_layer(name=name, attr=attr, prefix=ic_backbone, in_case_prefix_use=in_case_prefix_use, form=form,
-                          print_debug=print_status, nc=nc, anchors=anchors))
-        if not print_status:
-            print_model(name, attr, form=form, rank=rank, index=sva)
-        if name in in_case_prefix_use:
-            ic_backbone = attr[0]
-        save.extend(x % i for x in ([form] if isinstance(form, int) else form) if x != -1)
+        for _ in range(times):
+            model.append(
+                name_to_layer(name=name, attr=attr, prefix=ic_backbone, in_case_prefix_use=in_case_prefix_use,
+                              form=form,
+                              print_debug=print_status, nc=nc, anchors=anchors))
+            if not print_status:
+                print_model(name, attr, form=form, rank=times, index=idx)
+            if name in in_case_prefix_use:
+                ic_backbone = attr[0]
+            save.extend(x % idx for x in ([form] if isinstance(form, int) else form) if x != -1)
+            idx += 1
 
-    ic_head = ic_backbone
-    sva += 1
+    train_able_params, none_train_able_params, total_params, total_layers = 0, 0, 0, 0
 
-    for i, h in enumerate(head):
-        form = h[0]
-        rank = h[1]
-        name = h[2]
-        attr = attr_exist_check_(h, 3)
-        ic_head = ic_head * len(form) if name == 'Concat' else ic_head
-        model.append(
-            name_to_layer(name=name, attr=attr, prefix=ic_head, in_case_prefix_use=in_case_prefix_use, form=form,
-                          print_debug=print_status, nc=nc, anchors=anchors))
-        if not print_status:
-            print_model(name, attr, form=form, rank=rank, index=i + sva)
-        if name in in_case_prefix_use:
-            ic_head = attr[0]
-        save.extend(x % (i + sva) for x in ([form] if isinstance(form, int) else form) if x != -1)
-        k += 1
-
+    for name, parl in model.named_parameters():
+        total_layers += 1
+        total_params += parl.numel()
+        train_able_params += parl.numel() if parl.requires_grad else 0
+        none_train_able_params += parl.numel() if not parl.requires_grad else 0
+    total_params, train_able_params, none_train_able_params = str(total_params), str(train_able_params), str(
+        none_train_able_params)
     printf(
-        f'Model Created \nTotal Layers {Cp.CYAN}{k}{Cp.RESET}\nNumber Of Route Layers {Cp.CYAN}{len(save)}{Cp.RESET}\n')
+        f'Model Created \nTotal Layers {Cp.CYAN}{total_layers}{Cp.RESET}\nNumber Of Route Layers {Cp.CYAN}{len(save)}{Cp.RESET}\n')
+    printf(
+        f'Total Params : {Cp.CYAN}{total_params}{Cp.RESET}\nTrain Able Params : {Cp.CYAN}{train_able_params}'
+        f'{Cp.RESET}\nNone Train Able Params : {Cp.CYAN}{none_train_able_params}{Cp.RESET}\n')
     return model, save
 
 
@@ -171,3 +162,95 @@ def bbox_iou(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=False, eps=
             return iou - (c_area - union) / c_area  # GIoU
     else:
         return iou  # IoU
+
+
+@nb.jit(forceobj=True, fastmath=True)
+def fast_reader(path, total, names):
+    tta = []
+    for i in range(total):
+        ba = np.roll(
+            np.loadtxt(f'{path}/{names[i][:-4]}.txt', delimiter=" ", ndmin=2, ), 4,
+            axis=1).tolist()
+        tta.append(ba)
+    return tta
+
+
+import numpy as np
+
+
+def iou(box, clusters):
+    """
+    Calculates the Intersection over Union (IoU) between a box and k clusters.
+    :param box: tuple or array, shifted to the origin (i. e. width and height)
+    :param clusters: numpy array of shape (k, 2) where k is the number of clusters
+    :return: numpy array of shape (k, 0) where k is the number of clusters
+    """
+    x = np.minimum(clusters[:, 0], box[0])
+    y = np.minimum(clusters[:, 1], box[1])
+    if np.count_nonzero(x == 0) > 0 or np.count_nonzero(y == 0) > 0:
+        raise ValueError("Box has no area")
+
+    intersection = x * y
+    box_area = box[0] * box[1]
+    cluster_area = clusters[:, 0] * clusters[:, 1]
+
+    iou_ = intersection / (box_area + cluster_area - intersection)
+
+    return iou_
+
+
+def avg_iou(boxes, clusters):
+    """
+    Calculates the average Intersection over Union (IoU) between a numpy array of boxes and k clusters.
+    :param boxes: numpy array of shape (r, 2), where r is the number of rows
+    :param clusters: numpy array of shape (k, 2) where k is the number of clusters
+    :return: average IoU as a single float
+    """
+    return np.mean([np.max(iou(boxes[i], clusters)) for i in range(boxes.shape[0])])
+
+
+def translate_boxes(boxes):
+    """
+    Translates all the boxes to the origin.
+    :param boxes: numpy array of shape (r, 4)
+    :return: numpy array of shape (r, 2)
+    """
+    new_boxes = boxes.copy()
+    for row in range(new_boxes.shape[0]):
+        new_boxes[row][2] = np.abs(new_boxes[row][2] - new_boxes[row][0])
+        new_boxes[row][3] = np.abs(new_boxes[row][3] - new_boxes[row][1])
+    return np.delete(new_boxes, [0, 1], axis=1)
+
+
+def kmeans(boxes, k, dist=np.median):
+    """
+    Calculates k-means clustering with the Intersection over Union (IoU) metric.
+    :param boxes: numpy array of shape (r, 2), where r is the number of rows
+    :param k: number of clusters
+    :param dist: distance function
+    :return: numpy array of shape (k, 2)
+    """
+    rows = boxes.shape[0]
+
+    distances = np.empty((rows, k))
+    last_clusters = np.zeros((rows,))
+
+    np.random.seed()
+
+    clusters = boxes[np.random.choice(rows, k, replace=False)]
+
+    while True:
+        for row in range(rows):
+            distances[row] = 1 - iou(boxes[row], clusters)
+
+        nearest_clusters = np.argmin(distances, axis=1)
+
+        if (last_clusters == nearest_clusters).all():
+            break
+
+        for cluster in range(k):
+            clusters[cluster] = dist(boxes[nearest_clusters == cluster], axis=0)
+
+        last_clusters = nearest_clusters
+
+    return clusters

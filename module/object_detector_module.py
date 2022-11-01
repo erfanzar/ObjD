@@ -20,10 +20,13 @@ class ObjectDetectorModule(pl.LightningModule):
         self.anchors = None
         self.save = None
         self.m, self.nc, self.cfg, self.fr = None, 1, cfg, False
-        self.layer_creator()
         self.to(DEVICE)
         # self.loss = ComputeLoss(self.m)
         self.save_hyperparameters()
+
+    def init(self):
+        self.layer_creator()
+        self.m = self.m.to(self.device)
         self.loss = ComputeLoss(self.m)
 
     def layer_creator(self):
@@ -55,6 +58,9 @@ class ObjectDetectorModule(pl.LightningModule):
                 x = route[m.form] if isinstance(m.form, int) else [x if j == -1 else route[j] for j in m.form]
             x = m(x)
             route.append(x if i in self.save else None)
+            # saved_size = [*((a.element_size() * a.nelement())/100000 for a in route if a is not None)]
+            # print(saved_size)
+
         return x
 
     def configure_optimizers(self):
