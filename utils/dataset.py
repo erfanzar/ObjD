@@ -13,7 +13,7 @@ from PIL import Image
 from .anchor_predict import anchor_prediction
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
-from utils.utils import iou, Cp, fast_reader, kmeans, printf, avg_iou
+from utils.utils import iou, Cp, fast_reader, kmeans, printf, avg_iou, fast_normalize
 
 DEVICE = 'cuda:0' if T.cuda.is_available() else 'cpu'
 
@@ -76,8 +76,7 @@ class DataLoaderA(Dataset, ABC):
         way = []
         path = self.path_valid if is_val else self.path_train
         to_tensor = lambda ten: torch.from_numpy(ten)
-        tt, tn, ts = [lambda xf: xf.type(T.float64), lambda xr: xr / 255, lambda xs: xs.reshape(
-            (self.img_shape, self.img_shape, 3))]
+
         tm = len(current) if not self.debug else int(len(current) * (self.prc if not is_val else self.val_perc))
         setattr(self, 'tm', tm)
         print(f"{Cp.BLUE}Loading {tm} Samples{Cp.WHITE}")
@@ -96,9 +95,8 @@ class DataLoaderA(Dataset, ABC):
                 wax.append(int(w * self.img_shape))
                 way.append(int(h * self.img_shape))
             img = Image.open(f'{path}/{current[item][:-4]}.jpg')
-            image_pixel = list(list(pixel) for pixel in img.getdata())
-            image_rgb = np.array(image_pixel).reshape((self.img_shape, self.img_shape, 3))
-            x = ts(tn(tt(to_tensor(image_rgb)))).permute(2, 1, 0).reshape(3, self.img_shape, self.img_shape)
+            image_rgb = img[:, :, ::-1]
+            x = torch.from_numpy(fast_normalize(image_rgb))
             x = x.cpu()
             xsl.append(x)
             ysl.append(targets.cpu())
@@ -315,15 +313,10 @@ class DataLoaderTorch(Dataset, ABC):
                 h += y1
                 targets[i, :] = torch.tensor([item % self.batch_size, class_index, x1, y1, w, h])
             img = Image.open(f'{path}/{current[item][:-4]}.jpg')
-            to_tensor = lambda ten: torch.from_numpy(ten)
-            tt, tn, ts = [lambda xf: xf.type(T.float64), lambda xr: xr / 255, lambda xs: xs.reshape(
-                (self.img_shape, self.img_shape, 3))]
             data = img.getdata()
             image_pixel = list(list(pixel) for pixel in data)
-            image_rgb = np.array(image_pixel).reshape((self.img_shape, self.img_shape, 3))
-            image_bgr = image_rgb[:, :, ::-1]
-            x = ts(tn(tt(to_tensor(image_rgb)))).permute(2, 1, 0).reshape(3, self.img_shape, self.img_shape)
-            # x = x.type(T.cuda.FloatTensor) if DEVICE == 'cuda:0' else x.type(T.FloatTensor)
+            image_rgb = np.array(image_pixel)
+            x = torch.from_numpy(fast_normalize(image_rgb, self.img_shape))
             x = x.cpu()
             xsl.append(x)
 

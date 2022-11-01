@@ -102,6 +102,17 @@ def attr_exist_check_(attr, index):
     return s
 
 
+tt, tn, ts = [lambda xf: xf.type(T.float64), lambda xr: xr / 255, lambda xs: xs.reshape(
+    (self.img_shape, self.img_shape, 3))]
+
+
+@nb.jit(fastmath=True, forceobj=True)
+def fast_normalize(image, shape):
+    image = np.array(image, dtype=np.float32) / 255
+    image = image.reshape((1, 3, shape, shape))
+    return image
+
+
 def iou(box1, box2):
     print(box1)
     print(box2)
@@ -173,9 +184,6 @@ def fast_reader(path, total, names):
             axis=1).tolist()
         tta.append(ba)
     return tta
-
-
-import numpy as np
 
 
 def iou(box, clusters):
