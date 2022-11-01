@@ -61,11 +61,12 @@ def module_creator(backbone, head, print_status, ic_backbone, nc, anchors):
     sv_bb = []
     in_case_prefix_use = ['Conv']
     sva = 0
-
+    k = 0
     for i, b in enumerate(backbone):
         sva = i
         form = b[0]
         rank = b[1]
+        k += 1
         name = b[2]
         attr = attr_exist_check_(b, 3)
         ic_backbone = ic_backbone * len(form) if name == 'Concat' else ic_backbone
@@ -95,7 +96,10 @@ def module_creator(backbone, head, print_status, ic_backbone, nc, anchors):
         if name in in_case_prefix_use:
             ic_head = attr[0]
         save.extend(x % (i + sva) for x in ([form] if isinstance(form, int) else form) if x != -1)
+        k += 1
 
+    printf(
+        f'Model Created \nTotal Layers {Cp.CYAN}{k}{Cp.RESET}\nNumber Of Route Layers {Cp.CYAN}{len(save)}{Cp.RESET}\n')
     return model, save
 
 
