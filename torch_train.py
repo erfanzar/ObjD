@@ -1,27 +1,26 @@
+import argparse
+import math
 import os
 import time
 
 import torch.optim
-from utils.utils import printf, Cp
-from module.object_detector_module import ObjectDetectorModule
-from utils.dataset import DataLoaderTorch
-from utils.config import cfg as cfg_list
 
 from module.loss import ComputeLoss
+from module.object_detector_module import ObjectDetectorModule
+from utils.dataset import DataLoaderTorch
 from utils.logger import Logger
-
-import math
-import argparse
+from utils.utils import printf, Cp
 
 pars = argparse.ArgumentParser()
 pars.add_argument("--epochs", "-epochs", default=300, type=int, help='Epochs For Model Train')
 pars.add_argument("--data", "-data", default="data/path.yaml", type=str, help='Path to data yaml file')
 pars.add_argument("--cfg", "-configs", default="cfg/objd-s.yaml", type=str, help='Path to config file')
-pars.add_argument("--batch", "-batch size", default=6, type=int, help='Batch Size for train')
-pars.add_argument("--eval", "-eval model", default=False, type=bool, help='use validation for model')
-pars.add_argument("--debug", "-debug Mode", default=False, type=bool, help='For Developing')
+pars.add_argument("--batch", "-batch size", default=3, type=int, help='Batch Size for train')
+pars.add_argument("--eval", "-eval model", help='use validation for model',
+                  action='store_true')
+pars.add_argument("--debug", "-debug Mode", help='For Developing', action='store_true')
 pars.add_argument("--auto-anchors", "-anchors", default=False, type=bool, help='automate the anchors for your dataset')
-pars.add_argument("--device", '-Device', default='cuda:0', type=str,
+pars.add_argument("--device", '-Device', default='cuda:0' if torch.cuda.is_available() else 'cpu', type=str,
                   help="Device to train model Eg cpu cuda")
 
 opt = pars.parse_args()
@@ -53,16 +52,16 @@ def train(opt):
     scalar = torch.cuda.amp.GradScaler()
     eval_data = dataloader.val_datareader()
     loss_function = ComputeLoss(model, last_layer=model.m[-1])
-    ceil_train = math.ceil(train_data.__len__() / opt.batch)
-    ceil_eval = math.ceil(eval_data.__len__() / opt.batch)
+    ceil_train = math.ceil(train_data.__len__())
+    ceil_eval = math.ceil(eval_data.__len__())
 
     for epoch in range(opt.epochs):
         printf(f"Epoch {epoch + 1} / {opt.epochs} \n\n")
         for i in range(ceil_train):
+
             s = time.time()
             optimizer.zero_grad()
-            x, y = train_data.__getitem__(item=i)
-            # xs = torch.finfo(x.data.type).bits
+            x, y = train_data.__getitem__(i)
             x, y = x.to(opt.device), y.to(opt.device)
             x_ = model.forward(x)
             loss = loss_function(x_, y)
@@ -80,9 +79,10 @@ def train(opt):
                     'model': model.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'epoch_data': [epoch, opt.epochs],
-                    'anchors': model.anchors
+                    'anchors': model.anchors,
+                    'cfg': opt.cfg
                 }
-                torch.save(ckpt, 'model.ckpt')
+                torch.save(ckpt, 'model.pt')
 
         logger.end()
         for i in range(ceil_eval):

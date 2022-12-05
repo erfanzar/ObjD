@@ -1,28 +1,21 @@
-import sys
-
 import torch
 import torch.nn as nn
 import yaml
-from colorama import Fore
-from .loss import ComputeLoss
-from .commons import (Conv, Detect, ResidualBlock, Neck, C3, C4P, MP, UC1, CV1, RepConv, ConvSc, LP)
-import pytorch_lightning as pl
-from torchmetrics.functional import accuracy
+
 from utils.utils import module_creator
 from .loss import ComputeLoss
 
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 
-class ObjectDetectorModule(pl.LightningModule):
+class ObjectDetectorModule(nn.Module):
     def __init__(self, cfg: str = 'cfg/objd-s.yaml'):
         super(ObjectDetectorModule, self).__init__()
         self.anchors = None
         self.save = None
         self.m, self.nc, self.cfg, self.fr = None, 1, cfg, False
         self.to(DEVICE)
-        # self.loss = ComputeLoss(self.m)
-        self.save_hyperparameters()
+        self.device = DEVICE
 
     def init(self):
         self.layer_creator()
@@ -58,8 +51,7 @@ class ObjectDetectorModule(pl.LightningModule):
                 x = route[m.form] if isinstance(m.form, int) else [x if j == -1 else route[j] for j in m.form]
             x = m(x)
             route.append(x if i in self.save else None)
-            # saved_size = [*((a.element_size() * a.nelement())/100000 for a in route if a is not None)]
-            # print(saved_size)
+
 
         return x
 

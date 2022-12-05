@@ -1,12 +1,7 @@
-import sys
-
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import pytorch_lightning as pl
-from utils.utils import bbox_iou, de_parallel
-import math
+
+from utils.utils import bbox_iou
 
 
 def iou(box1, box2):
@@ -31,13 +26,15 @@ def smooth_BCE(eps=0.1):
     return 1.0 - 0.5 * eps, 0.5 * eps
 
 
-class ComputeLoss(pl.LightningModule):
+class ComputeLoss(nn.Module):
     def __init__(self, model, autobalance=False, last_layer=None):
+
         super(ComputeLoss, self).__init__()
         device = next(model.parameters()).device
+        self.device = device
         self.gr = 1.0
-        BCEcls = nn.BCEWithLogitsLoss()
-        BCEobj = nn.BCEWithLogitsLoss()
+        BCEcls = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(1.0, device=device))
+        BCEobj = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(1.0, device=device))
 
         self.cp, self.cn = smooth_BCE(eps=0.3)  # positive, negative BCE targets
 
@@ -81,7 +78,8 @@ class ComputeLoss(pl.LightningModule):
                 pxy = ps[:, :2].sigmoid() * 2. - 0.5
                 pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i].to(device)
                 pbox = torch.cat((pxy, pwh), 1)  # predicted box
-                iou = bbox_iou(pbox.T.to(device), tbox[i].to(device), x1y1x2y2=False, CIoU=True)  # iou(prediction, target)
+                iou = bbox_iou(pbox.T.to(device), tbox[i].to(device), x1y1x2y2=False,
+                               CIoU=True)  # iou(prediction, target)
                 iou = iou.to(device)
                 lbox += (1.0 - iou).mean()  # iou loss
 

@@ -2,12 +2,12 @@ import torch as T
 import torch
 import torch.jit
 import torch.nn as nn
-import pytorch_lightning as pl
+ 
 
 DEVICE = 'cuda:0' if T.cuda.is_available() else 'cpu'
 
 
-class Conv(pl.LightningModule):
+class Conv( nn.Module):
     def __init__(self, c1: int, c2: int, k: int = 1, s: int = 1, p: int = None, g: int = 1,
                  activation: [str, torch.nn] = None,
                  form: int = -1):
@@ -29,7 +29,7 @@ class Conv(pl.LightningModule):
         return x
 
 
-class Concat(pl.LightningModule):
+class Concat( nn.Module):
     def __init__(self, dim, form):
         super(Concat, self).__init__()
         self.form = form
@@ -39,7 +39,7 @@ class Concat(pl.LightningModule):
         return torch.cat(x, self.dim)
 
 
-class Neck(pl.LightningModule):
+class Neck( nn.Module):
     def __init__(self, c1, c2, e=0.5, shortcut=False, form: int = -1):
         super(Neck, self).__init__()
         c_ = int(c2 * e)
@@ -56,7 +56,7 @@ class Neck(pl.LightningModule):
         return k
 
 
-class C3(pl.LightningModule):
+class C3( nn.Module):
     def __init__(self, c1, c2, e=0.5, n=1, shortcut=True, form: int = -1):
         super(C3, self).__init__()
         c_ = int(c2 * e)
@@ -82,7 +82,7 @@ class C4P(C3):
         return x
 
 
-class RepConv(pl.LightningModule):
+class RepConv( nn.Module):
     def __init__(self, c, e=0.5, n=3, form: int = -1):
         super(RepConv, self).__init__()
         c_ = int(c * e)
@@ -114,7 +114,7 @@ class ConvSc(RepConv):
         return x + x_
 
 
-class ResidualBlock(pl.LightningModule):
+class ResidualBlock( nn.Module):
     def __init__(self, c1, n: int = 4, use_residual: bool = True, form: int = -1):
         super(ResidualBlock, self).__init__()
         self.use_residual = use_residual
@@ -140,6 +140,7 @@ class ResidualBlock(pl.LightningModule):
 
 class Detect(nn.Module):
     stride = False
+    interface = False
 
     def __init__(self, nc=4, anchors=(), ch=(), form=None):  # detection layer
         super(Detect, self).__init__()
@@ -147,6 +148,7 @@ class Detect(nn.Module):
             form = [-1, -2, -3]
         self.form = form
         self.nc = nc
+
         self.no = nc + 5  # number of outputs per anchor
         self.nl = len(anchors)  # number of detection layers
         self.na = len(anchors[0]) // 2  # number of anchors
@@ -166,9 +168,12 @@ class Detect(nn.Module):
             x[i] = self.m[i](x[i])  # conv
             bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
             x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
+        if self.interface:
 
-
-
+            for p in x:
+                # print(p.shape)
+                z.append(p.view(bs, -1, self.no))
+            x = torch.cat(z, 1)
         return x
 
     @staticmethod
@@ -189,7 +194,7 @@ class Detect(nn.Module):
         return (box, score)
 
 
-class CV1(pl.LightningModule):
+class CV1( nn.Module):
     def __init__(self, c1, c2, e=0.5, n=1, shortcut=False, dim=-3, form: int = -1):
         super(CV1, self).__init__()
         c_ = int(c2 * e)
@@ -209,7 +214,7 @@ class CV1(pl.LightningModule):
             torch.cat((self.c(x), self.v(x)), dim=self.dim)) + x
 
 
-class UC1(pl.LightningModule):
+class UC1( nn.Module):
     def __init__(self, c1, c2, e=0.5, dim=-3, form: int = -1):
         super(UC1, self).__init__()
         self.form = form
@@ -223,7 +228,7 @@ class UC1(pl.LightningModule):
         return self.m(torch.cat((self.c(x), self.v(x)), dim=self.dim))
 
 
-class MP(pl.LightningModule):
+class MP( nn.Module):
     def __init__(self, k=2, form: int = -1):
         super(MP, self).__init__()
         self.form = form
@@ -234,7 +239,7 @@ class MP(pl.LightningModule):
         return x
 
 
-class SP(pl.LightningModule):
+class SP( nn.Module):
     def __init__(self, k=3, s=1, form: int = -1):
         super(SP, self).__init__()
         self.form = form
@@ -245,7 +250,7 @@ class SP(pl.LightningModule):
         return x
 
 
-class LP(pl.LightningModule):
+class LP( nn.Module):
     def __init__(self, dim: int = None):
         super(LP, self).__init__()
         self.dim = dim
@@ -254,7 +259,7 @@ class LP(pl.LightningModule):
         return torch.cat((l1, l2), dim=dim_f if self.dim is None else self.dim)
 
 
-class UpSample(pl.LightningModule):
+class UpSample( nn.Module):
     def __init__(self, s: int = 2, m: str = 'nearest', form: int = -1):
         super(UpSample, self).__init__()
         self.form = form
